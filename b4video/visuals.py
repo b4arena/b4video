@@ -53,32 +53,25 @@ def generate_visuals(
 
 
 def _upload_audio(audio_path: Path, config: Config) -> str:
-    """Upload audio file to HeyGen and return the audio URL.
+    """Upload audio file to HeyGen and return the asset ID.
 
-    Uses HeyGen's asset upload endpoint. Falls back to serving via
-    a temporary local HTTP server if the upload endpoint is unavailable.
+    Uses upload.heygen.com with raw binary body and Content-Type header.
     """
-    headers = {"X-Api-Key": config.heygen_api_key}
-
-    # Try HeyGen's asset upload endpoints
     with httpx.Client(timeout=60) as client:
-        for endpoint in ["/v2/assets", "/v1/asset"]:
-            try:
-                resp = client.post(
-                    f"{HEYGEN_API_BASE}{endpoint}",
-                    headers=headers,
-                    files={"file": ("audio.mp3", audio_path.read_bytes(), "audio/mpeg")},
-                )
-                if resp.status_code == 200:
-                    data = resp.json().get("data", {})
-                    # Return asset_id — the generate endpoint handles the reference
-                    asset_id = data.get("asset_id") or data.get("id")
-                    if asset_id:
-                        return asset_id
-            except Exception:
-                continue
+        resp = client.post(
+            "https://upload.heygen.com/v1/asset",
+            headers={
+                "X-Api-Key": config.heygen_api_key,
+                "Content-Type": "audio/mpeg",
+            },
+            content=audio_path.read_bytes(),
+        )
+        if resp.status_code == 200:
+            data = resp.json().get("data", {})
+            asset_id = data.get("id") or data.get("asset_id")
+            if asset_id:
+                return asset_id
 
-    # Asset upload not available — return empty to signal fallback
     return ""
 
 
