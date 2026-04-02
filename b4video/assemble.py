@@ -1,4 +1,4 @@
-"""Stage 5: Assemble final video — concatenate scenes, add music, generate subtitles."""
+"""Stage 5: Assemble final video — crossfade scenes, add music, generate subtitles."""
 
 from __future__ import annotations
 
@@ -10,9 +10,7 @@ from pathlib import Path
 from b4video.manifest import Manifest
 from b4video.parser import Scene, SceneMeta
 
-CROSSFADE_DURATION = 0.5
-TARGET_LUFS = -16
-MUSIC_LUFS = -30
+CROSSFADE_DURATION = 0.5  # seconds
 
 
 def assemble_video(
@@ -39,7 +37,6 @@ def assemble_video(
     # Collect available composed scenes
     scene_files: list[Path] = []
 
-    # Check for intro template
     intro = Path("assets/intro.mp4")
     if intro.exists():
         scene_files.append(intro)
@@ -49,7 +46,6 @@ def assemble_video(
         if composed.exists():
             scene_files.append(composed)
 
-    # Check for outro template
     outro = Path("assets/outro.mp4")
     if outro.exists():
         scene_files.append(outro)
@@ -59,7 +55,7 @@ def assemble_video(
         raise RuntimeError("No composed scenes found in build/composed/")
 
     try:
-        _concatenate(scene_files, final_path, meta)
+        _assemble_with_crossfades(scene_files, final_path, meta)
         _generate_subtitles(build_dir, output_dir)
         art.mark_complete()
         manifest.save(build_dir)
@@ -71,42 +67,111 @@ def assemble_video(
     return final_path
 
 
-def _concatenate(files: list[Path], output: Path, meta: SceneMeta) -> None:
-    """Concatenate video files with crossfade transitions."""
+def _get_duration(path: Path) -> float:
+    """Get video duration in seconds via ffprobe."""
+    result = subprocess.run(
+        ["ffprobe", "-v", "error", "-show_entries", "format=duration",
+         "-of", "csv=p=0", str(path)],
+        capture_output=True, text=True,
+    )
+    return float(result.stdout.strip())
+
+
+def _assemble_with_crossfades(files: list[Path], output: Path, meta: SceneMeta) -> None:
+    """Assemble video files with xfade crossfade transitions between scenes."""
     if len(files) == 1:
-        # Single file — just copy
         subprocess.run(
             ["ffmpeg", "-y", "-i", str(files[0]), "-c", "copy", str(output)],
             capture_output=True, text=True, check=True,
         )
         return
 
-    # Build concat filter with crossfades
-    width, height = meta.resolution.split("x")
+    if len(files) == 2:
+        # Simple two-file crossfade
+        dur0 = _get_duration(files[0])
+        offset = dur0 - CROSSFADE_DURATION
 
-    # For simplicity with crossfades, use the concat demuxer for now
-    # and apply audio normalization as a second pass
-    with tempfile.NamedTemporaryFile(mode="w", suffix=".txt", delete=False) as f:
-        for path in files:
-            f.write(f"file '{path.resolve()}'\n")
-        filelist = f.name
+        cmd = [
+            "ffmpeg", "-y",
+            "-i", str(files[0]),
+            "-i", str(files[1]),
+            "-filter_complex",
+            f"[0:v][1:v]xfade=transition=fade:duration={CROSSFADE_DURATION}:offset={offset}[v];"
+            f"[0:a][1:a]acrossfade=d={CROSSFADE_DURATION}[a]",
+            "-map", "[v]", "-map", "[a]",
+            "-c:v", "libopenh264",
+            "-c:a", "aac", "-b:a", "192k",
+            "-movflags", "+faststart",
+            str(output),
+        ]
 
-    # Pass 1: concatenate
-    concat_cmd = [
+        result = subprocess.run(cmd, capture_output=True, text=True)
+        if result.returncode != 0:
+            raise RuntimeError(f"FFmpeg xfade failed:\n{result.stderr}")
+        return
+
+    # Multiple files: chain xfade filters
+    # Get durations for offset calculation
+    durations = [_get_duration(f) for f in files]
+
+    # Build input args
+    inputs = []
+    for f in files:
+        inputs.extend(["-i", str(f)])
+
+    # Build chained xfade filter
+    # Each xfade takes two streams and produces one, consuming CROSSFADE_DURATION
+    # from the end of the first and start of the second
+    video_filters = []
+    audio_filters = []
+
+    # Calculate offsets: each offset is cumulative duration minus crossfade overlaps
+    cumulative = 0.0
+    offsets = []
+    for i, dur in enumerate(durations[:-1]):
+        cumulative += dur - CROSSFADE_DURATION
+        offsets.append(cumulative)
+
+    # Chain video xfade: [0:v][1:v]xfade -> [v01]; [v01][2:v]xfade -> [v012]; etc
+    n = len(files)
+    prev_label = "0:v"
+    for i in range(1, n):
+        out_label = f"v{i}"
+        offset = offsets[i - 1]
+        # Use cumulative offset from start, not from previous
+        actual_offset = sum(durations[:i]) - (CROSSFADE_DURATION * i)
+        video_filters.append(
+            f"[{prev_label}][{i}:v]xfade=transition=fade:"
+            f"duration={CROSSFADE_DURATION}:offset={actual_offset:.3f}[{out_label}]"
+        )
+        prev_label = out_label
+
+    # Chain audio acrossfade similarly
+    prev_alabel = "0:a"
+    for i in range(1, n):
+        out_alabel = f"a{i}"
+        audio_filters.append(
+            f"[{prev_alabel}][{i}:a]acrossfade=d={CROSSFADE_DURATION}[{out_alabel}]"
+        )
+        prev_alabel = out_alabel
+
+    filter_complex = ";".join(video_filters + audio_filters)
+
+    cmd = [
         "ffmpeg", "-y",
-        "-f", "concat", "-safe", "0",
-        "-i", filelist,
+        *inputs,
+        "-filter_complex", filter_complex,
+        "-map", f"[{prev_label}]",
+        "-map", f"[{prev_alabel}]",
         "-c:v", "libopenh264",
         "-c:a", "aac", "-b:a", "192k",
         "-movflags", "+faststart",
         str(output),
     ]
 
-    result = subprocess.run(concat_cmd, capture_output=True, text=True)
-    Path(filelist).unlink(missing_ok=True)
-
+    result = subprocess.run(cmd, capture_output=True, text=True)
     if result.returncode != 0:
-        raise RuntimeError(f"FFmpeg concat failed:\n{result.stderr}")
+        raise RuntimeError(f"FFmpeg xfade chain failed:\n{result.stderr}")
 
 
 def _generate_subtitles(build_dir: Path, output_dir: Path) -> None:
@@ -115,7 +180,7 @@ def _generate_subtitles(build_dir: Path, output_dir: Path) -> None:
     srt_path = output_dir / "subtitles.srt"
 
     if not timing_path.exists():
-        return  # No timing data available
+        return
 
     timing = json.loads(timing_path.read_text())
 
@@ -161,7 +226,6 @@ def _generate_subtitles(build_dir: Path, output_dir: Path) -> None:
             )
             counter += 1
 
-        # Offset for next scene = end of this scene's audio
         time_offset += ends[-1]
 
     srt_path.write_text("\n".join(srt_entries))
