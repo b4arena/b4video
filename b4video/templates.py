@@ -57,23 +57,23 @@ def generate_intro(
     filter_complex = ";".join([
         # Background color
         f"color=c={BG_COLOR}:s={width}x{height}:d={INTRO_DURATION}:r={fps},format=yuv420p[bg]",
-        # Logo: scale, fade in
-        f"[1:v]scale=300:-1,format=yuva420p,"
+        # Logo: scale to 480px wide, fade in
+        f"[1:v]scale=480:-1,format=yuva420p,"
         f"fade=t=in:st=0.3:d=0.7:alpha=1[logo]",
         # Overlay logo centered
-        f"[bg][logo]overlay=(W-w)/2:{logo_y - 75}:eof_action=pass[v1]",
+        f"[bg][logo]overlay=(W-w)/2:{logo_y - 120}:eof_action=pass[v1]",
         # Title text
         f"[v1]drawtext="
         f"text='{title_esc}':"
-        f"fontsize=64:fontcolor={TEXT_COLOR}:"
-        f"x=(w-text_w)/2:y={logo_y + 100}:"
+        f"fontsize=72:fontcolor={TEXT_COLOR}:"
+        f"x=(w-text_w)/2:y={logo_y + 130}:"
         f"alpha='if(lt(t\\,1.5)\\,0\\,min((t-1.5)/0.5\\,1))':"
         f"font='{FONT}'[v2]",
         # Subtitle text
         f"[v2]drawtext="
         f"text='{subtitle_esc}':"
-        f"fontsize=32:fontcolor={SUBTITLE_COLOR}:"
-        f"x=(w-text_w)/2:y={logo_y + 180}:"
+        f"fontsize=36:fontcolor={SUBTITLE_COLOR}:"
+        f"x=(w-text_w)/2:y={logo_y + 220}:"
         f"alpha='if(lt(t\\,2.0)\\,0\\,min((t-2.0)/0.5\\,1))':"
         f"font='{FONT}'[v3]",
         # Fade in from black
@@ -131,20 +131,20 @@ def generate_outro(
     filter_complex = ";".join([
         # Background
         f"color=c={BG_COLOR}:s={width}x{height}:d={OUTRO_DURATION}:r={fps},format=yuv420p[bg]",
-        # Logo
-        f"[1:v]scale=200:-1,format=yuva420p[logo]",
-        f"[bg][logo]overlay=(W-w)/2:{logo_y - 50}:eof_action=pass[v1]",
+        # Logo: 360px wide
+        f"[1:v]scale=360:-1,format=yuva420p[logo]",
+        f"[bg][logo]overlay=(W-w)/2:{logo_y - 80}:eof_action=pass[v1]",
         # Website URL
         f"[v1]drawtext="
         f"text='{website_esc}':"
-        f"fontsize=36:fontcolor={ACCENT_COLOR}:"
-        f"x=(w-text_w)/2:y={logo_y + 80}:"
+        f"fontsize=42:fontcolor={ACCENT_COLOR}:"
+        f"x=(w-text_w)/2:y={logo_y + 100}:"
         f"font='{FONT}'[v2]",
         # CTA — fades in
         f"[v2]drawtext="
         f"text='{cta_esc}':"
-        f"fontsize=28:fontcolor={TEXT_COLOR}:"
-        f"x=(w-text_w)/2:y={logo_y + 140}:"
+        f"fontsize=32:fontcolor={TEXT_COLOR}:"
+        f"x=(w-text_w)/2:y={logo_y + 160}:"
         f"alpha='if(lt(t\\,2.5)\\,0\\,min((t-2.5)/0.5\\,1))':"
         f"font='{FONT}'[v3]",
         # Fade to black at end
