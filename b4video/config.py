@@ -9,6 +9,15 @@ from pathlib import Path
 import yaml
 
 
+# Brand defaults — override via config file or env vars
+BUILTIN_VOICES = {
+    "b4arena-default": "IKne3meq5aSn9XLyUdCD",  # Charlie — Deep, Confident, Energetic
+}
+BUILTIN_AVATARS = {
+    "presenter-01": "August_Hoodies_Front_public",  # August in hoodie, front-facing
+}
+
+
 @dataclass
 class Config:
     """b4video configuration."""
@@ -17,8 +26,8 @@ class Config:
     heygen_api_key: str = ""
     default_voice: str = "b4arena-default"
     default_avatar: str = "presenter-01"
-    voices: dict[str, str] = field(default_factory=dict)
-    avatars: dict[str, str] = field(default_factory=dict)
+    voices: dict[str, str] = field(default_factory=lambda: dict(BUILTIN_VOICES))
+    avatars: dict[str, str] = field(default_factory=lambda: dict(BUILTIN_AVATARS))
 
 
 def load_config() -> Config:

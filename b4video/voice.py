@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import base64
+import json
 from pathlib import Path
 
 from b4video.config import Config
@@ -36,7 +38,7 @@ def generate_voice(
     # Resolve voice alias to ID
     voice_id = config.voices.get(meta.voice, meta.voice)
 
-    timing_data: dict[str, list] = {}
+    timing_data: dict[str, dict] = {}
 
     for scene in scenes:
         key = f"audio-scene-{scene.index:02d}"
@@ -55,22 +57,18 @@ def generate_voice(
                 output_format="mp3_44100_128",
             )
 
-            # Write audio
-            audio_bytes = b""
-            word_timestamps = []
-            for chunk in response:
-                if hasattr(chunk, "audio_base64") and chunk.audio_base64:
-                    import base64
-                    audio_bytes += base64.b64decode(chunk.audio_base64)
-                if hasattr(chunk, "alignment") and chunk.alignment:
-                    word_timestamps.append({
-                        "characters": chunk.alignment.characters,
-                        "start_times": chunk.alignment.character_start_times_seconds,
-                        "end_times": chunk.alignment.character_end_times_seconds,
-                    })
-
+            # Response is an AudioWithTimestampsResponse object (not a generator)
+            audio_bytes = base64.b64decode(response.audio_base_64)
             audio_path.write_bytes(audio_bytes)
-            timing_data[f"scene-{scene.index:02d}"] = word_timestamps
+
+            # Extract alignment data
+            if response.alignment:
+                timing_data[f"scene-{scene.index:02d}"] = {
+                    "characters": response.alignment.characters,
+                    "start_times": response.alignment.character_start_times_seconds,
+                    "end_times": response.alignment.character_end_times_seconds,
+                }
+
             art.mark_complete()
 
         except Exception as e:
@@ -80,6 +78,5 @@ def generate_voice(
         manifest.save(build_dir)
 
     # Write timing data
-    import json
     timing_path = audio_dir / "timing.json"
     timing_path.write_text(json.dumps(timing_data, indent=2))

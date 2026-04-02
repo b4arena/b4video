@@ -124,26 +124,45 @@ def _generate_subtitles(build_dir: Path, output_dir: Path) -> None:
     time_offset = 0.0
 
     for scene_key in sorted(timing.keys()):
-        alignments = timing[scene_key]
-        for alignment in alignments:
-            chars = alignment.get("characters", [])
-            starts = alignment.get("start_times", [])
-            ends = alignment.get("end_times", [])
+        alignment = timing[scene_key]
+        chars = alignment.get("characters", [])
+        starts = alignment.get("start_times", [])
+        ends = alignment.get("end_times", [])
 
-            if not chars or not starts or not ends:
-                continue
+        if not chars or not starts or not ends:
+            continue
 
-            # Group characters into words/phrases for subtitle display
-            text = "".join(chars)
-            start_time = starts[0] + time_offset
-            end_time = ends[-1] + time_offset
+        # Group characters into words for subtitle display
+        word = ""
+        word_start = 0.0
+        for i, ch in enumerate(chars):
+            if ch == " " and word.strip():
+                srt_entries.append(
+                    f"{counter}\n"
+                    f"{_format_srt_time(word_start + time_offset)} --> "
+                    f"{_format_srt_time(ends[i - 1] + time_offset)}\n"
+                    f"{word.strip()}\n"
+                )
+                counter += 1
+                word = ""
+                word_start = starts[i + 1] if i + 1 < len(starts) else starts[i]
+            else:
+                if not word:
+                    word_start = starts[i]
+                word += ch
 
+        # Last word
+        if word.strip():
             srt_entries.append(
                 f"{counter}\n"
-                f"{_format_srt_time(start_time)} --> {_format_srt_time(end_time)}\n"
-                f"{text}\n"
+                f"{_format_srt_time(word_start + time_offset)} --> "
+                f"{_format_srt_time(ends[-1] + time_offset)}\n"
+                f"{word.strip()}\n"
             )
             counter += 1
+
+        # Offset for next scene = end of this scene's audio
+        time_offset += ends[-1]
 
     srt_path.write_text("\n".join(srt_entries))
 

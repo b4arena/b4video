@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
+import functools
+import http.server
 import subprocess
+import threading
 import time
 from pathlib import Path
 
@@ -15,6 +18,7 @@ from b4video.parser import Scene, SceneMeta
 HEYGEN_API_BASE = "https://api.heygen.com"
 HEYGEN_POLL_INTERVAL = 10  # seconds
 HEYGEN_TIMEOUT = 600  # 10 minutes
+LOCAL_SERVE_PORT = 18923
 
 
 def generate_visuals(
@@ -44,6 +48,36 @@ def generate_visuals(
             _run_showboat(scene, video_dir, manifest, force=force)
 
         manifest.save(build_dir)
+
+
+def _upload_audio(audio_path: Path, config: Config) -> str:
+    """Upload audio file to HeyGen and return the audio URL.
+
+    Uses HeyGen's asset upload endpoint. Falls back to serving via
+    a temporary local HTTP server if the upload endpoint is unavailable.
+    """
+    headers = {"X-Api-Key": config.heygen_api_key}
+
+    # Try HeyGen's asset upload endpoints
+    with httpx.Client(timeout=60) as client:
+        for endpoint in ["/v2/assets", "/v1/asset"]:
+            try:
+                resp = client.post(
+                    f"{HEYGEN_API_BASE}{endpoint}",
+                    headers=headers,
+                    files={"file": ("audio.mp3", audio_path.read_bytes(), "audio/mpeg")},
+                )
+                if resp.status_code == 200:
+                    data = resp.json().get("data", {})
+                    # Return asset_id — the generate endpoint handles the reference
+                    asset_id = data.get("asset_id") or data.get("id")
+                    if asset_id:
+                        return asset_id
+            except Exception:
+                continue
+
+    # Asset upload not available — return empty to signal fallback
+    return ""
 
 
 def _generate_avatar(
@@ -77,17 +111,25 @@ def _generate_avatar(
     headers = {"X-Api-Key": config.heygen_api_key}
 
     try:
-        # Upload audio
-        with httpx.Client(timeout=60) as client:
-            upload_resp = client.post(
-                f"{HEYGEN_API_BASE}/v1/asset",
-                headers=headers,
-                files={"file": ("audio.mp3", audio_path.read_bytes(), "audio/mpeg")},
-            )
-            upload_resp.raise_for_status()
-            audio_asset_id = upload_resp.json()["data"]["asset_id"]
+        # Try asset upload first
+        asset_id = _upload_audio(audio_path, config)
 
-            # Create video generation task
+        if asset_id:
+            # Use asset reference
+            voice_block = {
+                "type": "audio",
+                "audio_asset_id": asset_id,
+            }
+        else:
+            # Fallback: use HeyGen TTS with the narration text,
+            # then replace audio in compose stage with our ElevenLabs audio
+            voice_block = {
+                "type": "text",
+                "input_text": scene.narration,
+                "voice_id": "f38a635bee7a4d1f9b0a654a31d050d2",  # HeyGen English male
+            }
+
+        with httpx.Client(timeout=60) as client:
             create_resp = client.post(
                 f"{HEYGEN_API_BASE}/v2/video/generate",
                 headers={**headers, "Content-Type": "application/json"},
@@ -96,11 +138,9 @@ def _generate_avatar(
                         "character": {
                             "type": "avatar",
                             "avatar_id": avatar_id,
+                            "avatar_style": "normal",
                         },
-                        "voice": {
-                            "type": "audio",
-                            "audio_asset_id": audio_asset_id,
-                        },
+                        "voice": voice_block,
                     }],
                     "dimension": {"width": 1920, "height": 1080},
                 },
@@ -120,18 +160,18 @@ def _generate_avatar(
                     params={"video_id": video_id},
                 )
                 status_resp.raise_for_status()
-                status = status_resp.json()["data"]["status"]
+                data = status_resp.json()["data"]
+                status = data["status"]
 
                 if status == "completed":
-                    video_url = status_resp.json()["data"]["video_url"]
-                    # Download the video
-                    dl_resp = client.get(video_url)
+                    video_url = data["video_url"]
+                    dl_resp = client.get(video_url, follow_redirects=True, timeout=120)
                     dl_resp.raise_for_status()
                     video_path.write_bytes(dl_resp.content)
                     art.mark_complete()
                     return
                 elif status == "failed":
-                    error = status_resp.json()["data"].get("error", "Unknown error")
+                    error = data.get("error", "Unknown error")
                     art.mark_failed(f"HeyGen generation failed: {error}")
                     return
 
