@@ -79,7 +79,7 @@ app.add_typer(templates_app, name="templates")
 def templates_intro(
     logo: str = typer.Argument(help="Path to logo image (PNG with transparency)"),
     output: str = typer.Option("assets/intro.mp4", "--output", "-o", help="Output path"),
-    title: str = typer.Option("b4arena", "--title", help="Title text"),
+    title: str = typer.Option("#B4arena", "--title", help="Title text"),
     subtitle: str = typer.Option("", "--subtitle", help="Subtitle text below title"),
 ) -> None:
     """Generate an intro template video."""
@@ -96,8 +96,11 @@ def templates_intro(
 def templates_outro(
     logo: str = typer.Argument(help="Path to logo image (PNG with transparency)"),
     output: str = typer.Option("assets/outro.mp4", "--output", "-o", help="Output path"),
-    website: str = typer.Option("b4arena.com", "--website", help="Website URL text"),
+    title: str = typer.Option("#B4arena", "--title", help="Brand title"),
+    website: str = typer.Option("b4arena.com", "--website", help="Website text"),
+    url: str = typer.Option("tabula.b4madservice.workers.dev", "--url", help="URL label under QR code"),
     cta: str = typer.Option("Subscribe for more", "--cta", help="Call-to-action text"),
+    qr_code: str | None = typer.Option(None, "--qr", help="Path to QR code image (PNG)"),
 ) -> None:
     """Generate an outro template video."""
     from pathlib import Path
@@ -105,7 +108,11 @@ def templates_outro(
     from b4video.templates import generate_outro
 
     Path(output).parent.mkdir(parents=True, exist_ok=True)
-    generate_outro(Path(output), Path(logo), website=website, cta=cta)
+    qr_path = Path(qr_code) if qr_code else None
+    generate_outro(
+        Path(output), Path(logo),
+        title=title, website=website, url=url, cta=cta, qr_code=qr_path,
+    )
     typer.echo(f"Outro generated: {output}")
 
 
