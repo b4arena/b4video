@@ -1,0 +1,40 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "b4video"
+version = "0.1.0"
+description = "Automated video production pipeline — script to YouTube via ElevenLabs + HeyGen + FFmpeg"
+readme = "README.md"
+license = "GPL-3.0-or-later"
+requires-python = ">=3.12"
+dependencies = [
+    "typer>=0.15",
+    "elevenlabs>=1.0",
+    "httpx>=0.27",
+    "ffmpeg-python>=0.2",
+    "pyyaml>=6.0",
+    "markdown-it-py>=3.0",
+    "rich>=13.0",
+]
+
+[project.scripts]
+b4video = "b4video.cli:app"
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+    "pytest-cov>=5.0",
+    "ruff>=0.8",
+]
+
+[tool.ruff]
+target-version = "py312"
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "W"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
