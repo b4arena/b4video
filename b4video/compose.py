@@ -82,7 +82,7 @@ def _compose_presenter(
         f"pad={width}:{height}:(ow-iw)/2:(oh-ih)/2[v]",
         "-map", "[v]",
         "-map", "1:a",
-        "-c:v", "libx264", "-preset", "medium", "-crf", "18",
+        "-c:v", "libopenh264",
         "-c:a", "aac", "-b:a", "192k",
         "-r", str(fps),
         str(output),
@@ -142,7 +142,7 @@ def _compose_demo(
         "-filter_complex", ";".join(filter_parts),
         "-map", map_video,
         "-map", f"{len(inputs)//2}:a",  # audio input index
-        "-c:v", "libx264", "-preset", "medium", "-crf", "18",
+        "-c:v", "libopenh264",
         "-c:a", "aac", "-b:a", "192k",
         "-r", str(fps),
         str(output),

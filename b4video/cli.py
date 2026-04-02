@@ -71,6 +71,44 @@ def avatars_preview(alias: str = typer.Argument(help="Avatar alias to preview"))
     # TODO: implement HeyGen preview
 
 
+templates_app = typer.Typer(help="Generate intro/outro template videos.")
+app.add_typer(templates_app, name="templates")
+
+
+@templates_app.command("intro")
+def templates_intro(
+    logo: str = typer.Argument(help="Path to logo image (PNG with transparency)"),
+    output: str = typer.Option("assets/intro.mp4", "--output", "-o", help="Output path"),
+    title: str = typer.Option("b4arena", "--title", help="Title text"),
+    subtitle: str = typer.Option("", "--subtitle", help="Subtitle text below title"),
+) -> None:
+    """Generate an intro template video."""
+    from pathlib import Path
+
+    from b4video.templates import generate_intro
+
+    Path(output).parent.mkdir(parents=True, exist_ok=True)
+    generate_intro(Path(output), Path(logo), title=title, subtitle=subtitle)
+    typer.echo(f"Intro generated: {output}")
+
+
+@templates_app.command("outro")
+def templates_outro(
+    logo: str = typer.Argument(help="Path to logo image (PNG with transparency)"),
+    output: str = typer.Option("assets/outro.mp4", "--output", "-o", help="Output path"),
+    website: str = typer.Option("b4arena.com", "--website", help="Website URL text"),
+    cta: str = typer.Option("Subscribe for more", "--cta", help="Call-to-action text"),
+) -> None:
+    """Generate an outro template video."""
+    from pathlib import Path
+
+    from b4video.templates import generate_outro
+
+    Path(output).parent.mkdir(parents=True, exist_ok=True)
+    generate_outro(Path(output), Path(logo), website=website, cta=cta)
+    typer.echo(f"Outro generated: {output}")
+
+
 @app.command()
 def subtitles(
     video: str = typer.Argument(help="Path to rendered video or build directory"),

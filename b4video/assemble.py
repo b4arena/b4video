@@ -96,7 +96,7 @@ def _concatenate(files: list[Path], output: Path, meta: SceneMeta) -> None:
         "ffmpeg", "-y",
         "-f", "concat", "-safe", "0",
         "-i", filelist,
-        "-c:v", "libx264", "-preset", "medium", "-crf", "18",
+        "-c:v", "libopenh264",
         "-c:a", "aac", "-b:a", "192k",
         "-movflags", "+faststart",
         str(output),
