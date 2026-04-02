@@ -28,9 +28,10 @@ class Scene:
 
     index: int
     heading: str
-    scene_type: str  # "presenter" or "demo"
+    scene_type: str  # "presenter", "demo", or "whiteboard"
     narration: str
     showboat_script: str | None = None
+    diagram: str | None = None
 
 
 def parse_script(script_path: str | Path) -> tuple[SceneMeta, list[Scene]]:
@@ -94,6 +95,7 @@ def _parse_scenes(body: str) -> list[Scene]:
             scene_type = "demo"
 
         showboat = _extract_comment(content, "showboat")
+        diagram = _extract_comment(content, "diagram")
 
         # Narration is the content minus HTML comments
         narration = re.sub(r"<!--.*?-->", "", content, flags=re.DOTALL).strip()
@@ -104,6 +106,7 @@ def _parse_scenes(body: str) -> list[Scene]:
             scene_type=scene_type,
             narration=narration,
             showboat_script=showboat,
+            diagram=diagram,
         ))
 
     return scenes
@@ -120,7 +123,7 @@ def _validate(meta: SceneMeta, scenes: list[Scene], script_dir: Path) -> None:
     if not scenes:
         raise ValueError("Script must contain at least one ## section")
 
-    valid_types = {"presenter", "demo"}
+    valid_types = {"presenter", "demo", "whiteboard"}
     for scene in scenes:
         if scene.scene_type not in valid_types:
             raise ValueError(
@@ -131,6 +134,11 @@ def _validate(meta: SceneMeta, scenes: list[Scene], script_dir: Path) -> None:
             raise ValueError(
                 f"Scene '{scene.heading}': demo scenes require a "
                 f"<!-- showboat: path/to/script.sh --> comment"
+            )
+        if scene.scene_type == "whiteboard" and not scene.diagram:
+            raise ValueError(
+                f"Scene '{scene.heading}': whiteboard scenes require a "
+                f"<!-- diagram: path/to/diagram.yaml --> comment"
             )
         if not scene.narration:
             raise ValueError(f"Scene '{scene.heading}': no narration text found")

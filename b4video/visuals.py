@@ -46,6 +46,8 @@ def generate_visuals(
             _generate_avatar(scene, audio_dir, video_dir, manifest, config, avatar_id, force=force)
         elif scene.scene_type == "demo":
             _run_showboat(scene, video_dir, manifest, force=force)
+        elif scene.scene_type == "whiteboard":
+            _render_whiteboard(scene, audio_dir, video_dir, build_dir, manifest, config, avatar_id, meta, force=force)
 
         manifest.save(build_dir)
 
@@ -227,3 +229,51 @@ def _run_showboat(
     except Exception as e:
         art.mark_failed(str(e))
         raise
+
+
+def _render_whiteboard(
+    scene: Scene,
+    audio_dir: Path,
+    video_dir: Path,
+    build_dir: Path,
+    manifest: Manifest,
+    config: Config,
+    avatar_id: str,
+    meta: SceneMeta,
+    *,
+    force: bool = False,
+) -> None:
+    """Render a whiteboard diagram + avatar PiP for a scene."""
+    from b4video.whiteboard import render_whiteboard
+
+    # Render the diagram video
+    wb_key = f"video-scene-{scene.index:02d}-whiteboard"
+    wb_path = video_dir / f"scene-{scene.index:02d}-whiteboard.mp4"
+
+    if force or not manifest.is_complete(wb_key) or not wb_path.exists():
+        art = manifest.get_or_create(wb_key, str(wb_path))
+        try:
+            diagram_path = Path(scene.diagram)
+            if not diagram_path.exists():
+                art.mark_failed(f"Diagram not found: {diagram_path}")
+                return
+
+            timing_path = build_dir / "audio" / "timing.json"
+            width, height = meta.resolution.split("x")
+
+            render_whiteboard(
+                diagram_path=diagram_path,
+                timing_path=timing_path,
+                scene_key=f"scene-{scene.index:02d}",
+                output_path=wb_path,
+                width=int(width),
+                height=int(height),
+                fps=meta.fps,
+            )
+            art.mark_complete()
+        except Exception as e:
+            art.mark_failed(str(e))
+            raise
+
+    # Also generate avatar for PiP overlay
+    _generate_avatar(scene, audio_dir, video_dir, manifest, config, avatar_id, force=force)

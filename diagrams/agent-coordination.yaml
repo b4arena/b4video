@@ -1,0 +1,152 @@
+canvas:
+  width: 1920
+  height: 1080
+  background: "#2f495e"
+
+elements:
+  - id: title
+    type: text
+    x: 960
+    y: 80
+    text: "Agent Coordination"
+    color: "#c0d5e7"
+    font_size: 42
+    anchor: middle
+
+  - id: box-forge
+    type: rect
+    x: 200
+    y: 350
+    width: 280
+    height: 140
+    fill: "#3e5f7a"
+    stroke: "#c0d5e7"
+    stroke_width: 3
+    label: "Forge"
+    label_color: "#c0d5e7"
+
+  - id: box-atlas
+    type: rect
+    x: 820
+    y: 350
+    width: 280
+    height: 140
+    fill: "#3e5f7a"
+    stroke: "#c9a84c"
+    stroke_width: 3
+    label: "Atlas"
+    label_color: "#c9a84c"
+
+  - id: box-rio
+    type: rect
+    x: 1440
+    y: 350
+    width: 280
+    height: 140
+    fill: "#3e5f7a"
+    stroke: "#7ca7cb"
+    stroke_width: 3
+    label: "Rio"
+    label_color: "#7ca7cb"
+
+  - id: arrow-forge-atlas
+    type: arrow
+    x1: 480
+    y1: 420
+    x2: 820
+    y2: 420
+    stroke: "#c0d5e7"
+    stroke_width: 2
+    label: "Pull Request"
+    label_color: "#7ca7cb"
+
+  - id: arrow-atlas-rio
+    type: arrow
+    x1: 1100
+    y1: 420
+    x2: 1440
+    y2: 420
+    stroke: "#c9a84c"
+    stroke_width: 2
+    label: "Design Review"
+    label_color: "#c9a84c"
+
+  - id: box-beads
+    type: rect
+    x: 700
+    y: 650
+    width: 520
+    height: 120
+    fill: "#2f495e"
+    stroke: "#567b9a"
+    stroke_width: 2
+    rx: 16
+    label: "Beads (Dolt Issue Tracker)"
+    label_color: "#567b9a"
+
+  - id: arrow-forge-beads
+    type: arrow
+    x1: 340
+    y1: 490
+    x2: 700
+    y2: 700
+    stroke: "#567b9a"
+    stroke_width: 1
+    label: ""
+    label_color: "#567b9a"
+
+  - id: arrow-atlas-beads
+    type: arrow
+    x1: 960
+    y1: 490
+    x2: 960
+    y2: 650
+    stroke: "#567b9a"
+    stroke_width: 1
+    label: ""
+    label_color: "#567b9a"
+
+  - id: arrow-rio-beads
+    type: arrow
+    x1: 1580
+    y1: 490
+    x2: 1220
+    y2: 700
+    stroke: "#567b9a"
+    stroke_width: 1
+    label: ""
+    label_color: "#567b9a"
+
+  - id: label-four-eyes
+    type: text
+    x: 960
+    y: 280
+    text: "Four Eyes Protocol"
+    color: "#c9a84c"
+    font_size: 28
+    anchor: middle
+
+steps:
+  - at_word: "Forge"
+    reveal: ["box-forge"]
+    effect: fade
+
+  - at_word: "writes"
+    reveal: ["title"]
+    effect: fade
+
+  - at_word: "Atlas"
+    reveal: ["box-atlas", "arrow-forge-atlas"]
+    effect: fade
+
+  - at_word: "Four"
+    reveal: ["label-four-eyes"]
+    effect: fade
+
+  - at_word: "Rio"
+    reveal: ["box-rio", "arrow-atlas-rio"]
+    effect: fade
+
+  - at_word: "Beads"
+    reveal: ["box-beads", "arrow-forge-beads", "arrow-atlas-beads", "arrow-rio-beads"]
+    effect: fade
